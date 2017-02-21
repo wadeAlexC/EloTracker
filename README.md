@@ -4,6 +4,7 @@ A command line tool that allows you to calculate and track Elo ratings for playe
 <h3>How to use this tool:</h3>
 -Install the latest version of Python 3 and upgrade pip
 -This project uses an API called plotly. In order to use the graph function, you have to sign up for an account and get an API key. When you get the API key, head to the bottom of the main.py file and replace the username and API_Key with your plotly username and API_Key. The API is free to use, but limited to 50 graphs per day.
+Your API key can be found here: https://plot.ly/settings/api
 -Navigate to the directory you downloaded the program to
 -Next, do 'pip install plotly'
 -Finally, enter 'python main.py'
