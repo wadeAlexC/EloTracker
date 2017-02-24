@@ -154,7 +154,8 @@ def calculateElo(gametype, eloConst):
 
                 #getPlayerElo(name,gametype) returns a string of the form "Gametype:Elo", so we need to grab the relevant number and convert it to a float
                 #We then append this to the inputPlayerEloList
-                playerElo = float(getPlayerElo(userInput, gametype)[len(gametype + ":"):])
+                eloNum = getPlayerElo(userInput, gametype)[0].split("\n")[1][len(gametype + ":"):]
+                playerElo = float(eloNum)
                 inputPlayerEloList.append(playerElo)
                 inputTeamEloList[i] += playerElo
 
@@ -271,34 +272,52 @@ def calculateElo(gametype, eloConst):
 
 #Returns a string representing the player's Elo in all gametypes, or if a specific one is requested, just that one is returned.
 def getPlayerElo(playerName, gametype):
+    returnAllPlayers = (playerName.lower() == "all")
+
+    toReturn = []
+
+    playersToGet = []
+    if returnAllPlayers:
+        playersToGet = getPlayers()
+    else:
+        playersToGet.append(playerName.lower())
+
     try:
         curDir = os.path.dirname(os.path.realpath("__file__"))
         playerDir = os.path.join(curDir, "players")
 
-        #Read the player file
-        if os.path.isfile(playerDir + "/" + playerName.lower() + ".txt"):
-            playerFileD = os.open(playerDir + "/" + playerName.lower() + ".txt", os.O_RDONLY)
-            with os.fdopen(playerFileD, "r") as playerFileReader:
-                eloArr = playerFileReader.readline().split("/")
+        #For each player to get,
+        for player in playersToGet:
+            # Read the player file
+            if os.path.isfile(playerDir + "/" + player.lower() + ".txt"):
+                playerFileD = os.open(playerDir + "/" + player.lower() + ".txt", os.O_RDONLY)
+                with os.fdopen(playerFileD, "r") as playerFileReader:
+                    eloArr = playerFileReader.readline().split("/")
 
-            if gametype == "": #if no gametype was passed to the method, return a string containing all gametypes
-                eloStr = "\n".join(eloArr).rstrip()
-                if eloStr == "":
-                    return "No elo found"
-                return eloStr
+                if gametype == "":  # if no gametype was passed to the method, append a string containing all gametypes
+                    eloStr = "\n".join(eloArr).rstrip()
+                    if eloStr == "":
+                        return ["No elo found"]
+                    toReturn.append(player + ":\n" + eloStr + "\n=======")
+                else: #Otherwise, append the string corresponding to the passed gametype
+                    for eloListing in eloArr:
+                        if eloListing[:len(gametype)].lower() == gametype.lower():
+                            if eloListing == "":
+                                return ["No elo found"]
+                            toReturn.append(player.lower() + ":\n" + eloListing + "\n=======")
+
+                if len(toReturn) == 0:
+                    return ["Gametype %s not found" % (gametype)]
+
+
             else:
-                for eloListing in eloArr:
-                    if eloListing[:len(gametype)].lower() == gametype.lower():
-                        if eloListing == "":
-                            return "No elo found"
-                        return eloListing
+                return ["Player %s not found." % (player)]
 
-            return "Gametype %s not found" %(gametype)
-        else:
-            print("Player %s not found." %(playerName))
+        return toReturn
 
     except Exception as err:
         print(err)
+        return []
 
 
 #Sets the elo for player 'playerName' in game type 'gametype' to number 'eloStr'
@@ -349,8 +368,13 @@ def setElo(playerName, gametype, eloStr):
 
     #Rejoin the list and write to file
     lines[0] = "/".join(lineArr)
+    newLineInd = lines[0].find("\n")
+    if not newLineInd == -1:
+        lines[0] = lines[0][:newLineInd]
+
     with os.fdopen(os.open(playerDir + "/" + playerName.lower() + ".txt", os.O_WRONLY), "w") as playerFileWriter:
-        playerFileWriter.write("\n".join(lines))
+        toWrite = "\n".join(lines)
+        playerFileWriter.write(toWrite)
 
 
 #Either adds a default elo to each player if the value of modified is 'added', or removes the elo listing if the value is anything else
@@ -506,6 +530,53 @@ def graph(playerName, gametype):
     data = Data(dataList)
     print(str(data))
     py.plot(data, filename='EloPlot')
+
+
+#Key/value pair class to more easily sort players by Elo
+class KVPair(object):
+    def __init__(self, name, elo):
+        self.name = name
+        try:
+            self.elo = float(elo)
+        except Exception as err:
+            print("Error: " + err)
+
+    def __str__(self):
+        return self.name + ": " + str(self.elo)
+
+
+#Returns a list of players and their Elos in gametype, ranked from highest to lowest.
+#Players must have greater than or equal to minPlayed number of games in a gametype to be listed.
+def rank(gametype, minPlayed):
+    gametypes = getGameTypes()
+    playerList = getPlayers()
+    doesGameExist = False
+    for game in gametypes:
+        if game.lower() == gametype.lower():
+            doesGameExist = True
+
+    if not doesGameExist:
+        return ["Gametype %s not found." %(gametype)]
+
+    toReturn = []
+    curDir = os.path.dirname(os.path.realpath("__file__"))
+    playerDir = os.path.join(curDir, "players")
+
+    for player in playerList:
+        #For each player, get their history for a gametype. First check to make sure they have the minimum number of games played
+        #Then add them to the toReturn list to be sorted by Elo
+        playerHist = getPlayerHist(player, gametype)
+        if not len(playerHist) < int(minPlayed):
+            eloArr = getPlayerElo(player,gametype)[0].split('\n')
+            eloNum = eloArr[1][len(gametype + ":"):]
+            toReturn.append(KVPair(player, eloNum))
+
+    # Somehow this understood what I wanted, and it did it, too. Nice.
+    #Sorts the toReturn list based on the self.elo field of the KVPair class
+    toReturn = sorted(toReturn, key=lambda player: player.elo)
+
+    return toReturn
+
 
 
 #Returns a list containing each entry of a player's history pertaining to a gametype
@@ -760,6 +831,10 @@ def printCommands():
     print("'players' - Displays a list of all added players. \n =")
     print("'elo PlayerName' - Displays that player's elo for all gametypes \n =")
     print("'elo PlayerName gametype' - Displays a player's elo for the listed gametype \n =")
+    print("'elo all' - Displays every existing player's elo separated by player name \n =")
+    print("'rank gametype' - Displays every existing player and their elo in gametype, ranked from highest to lowest. \n")
+    print("-A player must have minimum 5 games player in gametype to be listed. \n =")
+    print("'rank gametype minPlayed' - Does the same as 'rank gametype', but with minimum minPlayed games to be listed. \n =")
     print("'del PlayerName' - Deletes a player along with their match history \n =")
     print("'hist PlayerName' - Displays a list of the games this player has played \n =")
     print("'eloset PlayerName gametype eloNum' - Sets 'PlayerName's' elo in 'gametype' to 'eloNum'. \n =")
@@ -804,9 +879,11 @@ def playerInput(eloConst):
             elif splitCommand[0] == "elo": #pull up information on a player if the player exists
                 if len(splitCommand) > 1:
                     if len(splitCommand) > 2:
-                        print(getPlayerElo(splitCommand[1], splitCommand[2]))
+                        for elo in getPlayerElo(splitCommand[1], splitCommand[2]):
+                            print(elo)
                     else:
-                        print(getPlayerElo(splitCommand[1], ""))
+                        for elo in getPlayerElo(splitCommand[1], ""):
+                            print(elo)
                 else:
                     displayIncorrectCommand(splitCommand[0])
             elif splitCommand[0] == "mkplayer":
@@ -821,6 +898,15 @@ def playerInput(eloConst):
             elif splitCommand[0] == "info":
                 if len(splitCommand) > 1:
                     print(getGametypeInfo(splitCommand[1]))
+                else:
+                    displayIncorrectCommand(splitCommand[0])
+            elif splitCommand[0] == "rank": #TODO fix amount of games played
+                if len(splitCommand) > 2:
+                    for player in rank(splitCommand[1], splitCommand[2]):
+                        print(str(player))
+                elif len(splitCommand) > 1:
+                    for player in rank(splitCommand[1], 5):
+                        print(str(player))
                 else:
                     displayIncorrectCommand(splitCommand[0])
             elif splitCommand[0] == "graph":
@@ -892,5 +978,5 @@ if not os.path.exists("gametypes"):
 if not os.path.exists("players"):
     os.mkdir("players")
 #Invokes main() with a value of 100 for the eloConstant, and sets up username and api key for plotly graphing utility
-plotly.tools.set_credentials_file(username='USERNAME_HERE', api_key='APIKEY_HERE')
+plotly.tools.set_credentials_file(username='wadeAlexPy', api_key='dzF6qiIM7yMm017Pi5Fx')
 main(100)
