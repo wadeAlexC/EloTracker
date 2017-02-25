@@ -978,5 +978,5 @@ if not os.path.exists("gametypes"):
 if not os.path.exists("players"):
     os.mkdir("players")
 #Invokes main() with a value of 100 for the eloConstant, and sets up username and api key for plotly graphing utility
-plotly.tools.set_credentials_file(username='wadeAlexPy', api_key='dzF6qiIM7yMm017Pi5Fx')
+plotly.tools.set_credentials_file(username='USERNAME', api_key='API KEY')
 main(100)
