@@ -10,9 +10,9 @@ Your API key can be found here: https://plot.ly/settings/api
 
 -Navigate to the directory you downloaded the program to
 
--Next, do 'pip install plotly'
+-Next, do 'pip3 install plotly'
 
--Finally, enter 'python main.py'
+-Finally, enter 'python3 main.py'
 
 
 <h3>Command List and Features:</h3>
